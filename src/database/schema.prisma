@@ -8,10 +8,27 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(uuid())
-  robloxId       String    @unique
-  xp             Int       @default(0)
-  suspendedUntil DateTime?
-  unsuspendRank  Int?
-  isBanned       Boolean   @default(false)
+  id                    String    @id @default(uuid())
+  robloxId              String    @unique
+  xp                    Int       @default(0)
+  suspendedUntil        DateTime?
+  unsuspendRank         Int?
+  isBanned              Boolean   @default(false)
+  weeklyActivityMinutes Int       @default(0)
+  monthlyActivityMinutes Int      @default(0)
+  lastActivityReset     DateTime?
+  sessions              Session[]
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  time      String    // e.g. "10AM EET"
+  date      DateTime  // The date of the session
+  status    String    @default("available") // available, claimed
+  claimedBy String?   // Discord user ID
+  role      String?   // Host, Trainer, Assistant
+  User      User?     @relation(fields: [userId], references: [id])
+  userId    String?
+
+  @@unique([time, date, role]) // Ensure only one person can claim each role per session time
 }

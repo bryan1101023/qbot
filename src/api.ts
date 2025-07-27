@@ -330,6 +330,58 @@ if(config.api) {
             return res.send({ success: false, msg: 'Failed to deny join request.' });
         }
     });
+
+    app.post('/activity/update', async (req, res) => {
+        const { robloxId, minutes } = req.body;
+        if(!robloxId || !minutes) return res.send({ success: false, msg: 'Missing parameters.' });
+        try {
+            const userData = await provider.findUser(robloxId.toString());
+            if(!userData) throw new Error();
+
+            // Check if we need to reset weekly/monthly activity
+            const now = new Date();
+            const lastReset = userData.lastActivityReset || new Date(0);
+            
+            // Reset weekly activity on Monday
+            const isMonday = now.getDay() === 1; // Monday is 1
+            const lastMonday = new Date(lastReset);
+            lastMonday.setDate(lastMonday.getDate() - lastMonday.getDay() + 1);
+            const currentMonday = new Date(now);
+            currentMonday.setDate(currentMonday.getDate() - currentMonday.getDay() + 1);
+            
+            // Reset monthly activity on 1st of month
+            const isFirstOfMonth = now.getDate() === 1;
+            const lastFirstOfMonth = new Date(lastReset.getFullYear(), lastReset.getMonth(), 1);
+            const currentFirstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            let weeklyActivity = userData.weeklyActivityMinutes;
+            let monthlyActivity = userData.monthlyActivityMinutes;
+
+            // Reset weekly activity if it's a new week
+            if (isMonday && currentMonday > lastMonday) {
+                weeklyActivity = 0;
+            }
+
+            // Reset monthly activity if it's a new month
+            if (isFirstOfMonth && currentFirstOfMonth > lastFirstOfMonth) {
+                monthlyActivity = 0;
+            }
+
+            // Add the new minutes
+            weeklyActivity += Number(minutes);
+            monthlyActivity += Number(minutes);
+
+            await provider.updateUser(robloxId.toString(), { 
+                weeklyActivityMinutes: weeklyActivity,
+                monthlyActivityMinutes: monthlyActivity,
+                lastActivityReset: now
+            });
+
+            return res.send({ success: true });
+        } catch (err) {
+            return res.send({ success: false, msg: 'Failed to update activity.' });
+        }
+    });
 }
 
 app.listen(process.env.PORT || 3001);

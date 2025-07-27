@@ -17,6 +17,7 @@ import { checkActionEligibility } from '../../handlers/verificationChecks';
 import { logAction } from '../../handlers/handleLogging';
 import { getLinkedRobloxUser } from '../../handlers/accountLinks';
 import { provider } from '../../database';
+import { CommandInteraction, Message } from 'discord.js';
 
 class SetRankCommand extends Command {
     constructor() {
@@ -52,11 +53,15 @@ class SetRankCommand extends Command {
                     ids: config.permissions.ranking,
                     value: true,
                 }
-            ]
+            ],
+            shouldDefer: true
         });
     }
 
     async run(ctx: CommandContext) {
+        function isInteraction(subject: any): subject is CommandInteraction {
+            return subject && typeof subject === 'object' && 'editReply' in subject && typeof subject.editReply === 'function';
+        }
         let robloxUser: User | PartialUser;
         try {
             robloxUser = await robloxClient.getUser(ctx.args['roblox-user'] as number);
@@ -73,7 +78,11 @@ class SetRankCommand extends Command {
                     if(!linkedUser) throw new Error();
                     robloxUser = linkedUser;
                 } catch (err) {
-                    return ctx.reply({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    if (isInteraction(ctx.subject)) {
+                        return ctx.subject.editReply({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    } else {
+                        return ctx.subject.channel.send({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    }
                 }
             }
         }
@@ -83,29 +92,46 @@ class SetRankCommand extends Command {
             robloxMember = await robloxGroup.getMember(robloxUser.id);
             if(!robloxMember) throw new Error();
         } catch (err) {
-            return ctx.reply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            if (isInteraction(ctx.subject)) {
+                return ctx.subject.editReply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            } else {
+                return ctx.subject.channel.send({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            }
         }
 
         const groupRoles = await robloxGroup.getRoles();
         const role = groupRoles.find((role) => role.id == ctx.args['roblox-role'] || role.rank == ctx.args['roblox-role'] || role.name.toLowerCase().startsWith(ctx.args['roblox-role'].toLowerCase()));
-        if(!role || !role.rank || role.rank === 0 || role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) return ctx.reply({ embeds: [ getRoleNotFoundEmbed() ]});
-        if(robloxMember.role.id === role.id) return ctx.reply({ embeds: [ getAlreadyRankedEmbed() ] });
+        const edit = async (payload: any) => {
+            if (isInteraction(ctx.subject)) {
+                return ctx.subject.editReply(payload);
+            } else {
+                return ctx.subject.channel.send(payload);
+            }
+        };
+        if(!role || !role.rank || role.rank === 0 || role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) return edit({ embeds: [ getRoleNotFoundEmbed() ]});
+        if(robloxMember.role.id === role.id) return edit({ embeds: [ getAlreadyRankedEmbed() ] });
 
         if(config.verificationChecks) {
             const actionEligibility = await checkActionEligibility(ctx.user.id, ctx.guild.id, robloxMember, role.rank);
-            if(!actionEligibility) return ctx.reply({ embeds: [ getVerificationChecksFailedEmbed() ] });
+            if(!actionEligibility) return edit({ embeds: [ getVerificationChecksFailedEmbed() ] });
         }
 
         const userData = await provider.findUser(robloxUser.id.toString());
-        if(userData.suspendedUntil) return ctx.reply({ embeds: [ getUserSuspendedEmbed() ] });
+        if(userData.suspendedUntil) return edit({ embeds: [ getUserSuspendedEmbed() ] });
 
         try {
             await robloxGroup.updateMember(robloxUser.id, role.id);
-            ctx.reply({ embeds: [ await getSuccessfulSetRankEmbed(robloxUser, role.name) ]})
+            await edit({ embeds: [ await getSuccessfulSetRankEmbed(robloxUser, role.name) ]});
             logAction('Update Rank', ctx.user, ctx.args['reason'], robloxUser, `${robloxMember.role.name} (${robloxMember.role.rank}) → ${role.name} (${role.rank})`);
-        } catch (err) {
-            console.log(err);
-            return ctx.reply({ embeds: [ getUnexpectedErrorEmbed() ]});
+        } catch (err: any) {
+            console.log('SetRank error:', err);
+            if (err.statusCode === 403) {
+                return edit({ content: '❌ The bot does not have permission to change this user\'s rank. Please check the bot\'s permissions and group rank.' });
+            }
+            if (err.statusCode === 404) {
+                return edit({ content: '❌ The user or role was not found. Please check the username/ID and try again.' });
+            }
+            return edit({ embeds: [ getUnexpectedErrorEmbed() ]});
         }
     }
 }

@@ -15,6 +15,8 @@ export const quoteIconUrl = 'https://cdn.lengolabs.com/qbot-icons/quote.png';
 export const mainColor = '#906FED';
 export const greenColor = '#50C790';
 export const redColor = '#FA5757';
+export const pinkColor = '#E75480'; // Not too light pink for neutral inactivity embeds
+export const orangeColor = '#FFA500'; // Orange for awaiting review inactivity embeds
 
 export const consoleMagenta = '\x1b[35m';
 export const consoleGreen = '\x1b[32m';
@@ -32,7 +34,12 @@ export const noSuspendedRankLog = `Uh oh, you do not have a suspended rank with 
 export const getListeningText = (port) => `${consoleGreen}✓  ${consoleClear}Listening on port ${port}.`;
 
 const getHeadshotImage = async (userId: number) => {
-    return (await robloxClient.apis.thumbnailsAPI.getUsersAvatarHeadShotImages({ userIds: [ userId ], size: '48x48', format: 'png' })).data[0];
+    try {
+        return (await robloxClient.apis.thumbnailsAPI.getUsersAvatarHeadShotImages({ userIds: [ userId ], size: '48x48', format: 'png' })).data[0];
+    } catch (error) {
+        console.error('Failed to get headshot image for user', userId, error);
+        return { imageUrl: null };
+    }
 }
 
 export const getUnknownCommandMessage = (): EmbedBuilder => {
@@ -211,8 +218,16 @@ export const getSuccessfulSuspendEmbed = async (user: User | PartialUser, newRol
     const embed = new EmbedBuilder()
         .setAuthor({ name: 'Success!', iconURL: checkIconUrl })
         .setColor(greenColor)
-        .setThumbnail((await getHeadshotImage(user.id)).imageUrl)
         .setDescription(`**${user.name}** has been successfully suspended, and will have their rank returned in <t:${Math.round(endDate.getTime() / 1000)}:R>.`);
+
+    try {
+        const headshot = await getHeadshotImage(user.id);
+        if (headshot && headshot.imageUrl) {
+            embed.setThumbnail(headshot.imageUrl);
+        }
+    } catch (error) {
+        console.error('Failed to set thumbnail for suspend embed:', error);
+    }
 
     return embed;
 }
@@ -221,8 +236,16 @@ export const getSuccessfulUnsuspendEmbed = async (user: User | PartialUser, newR
     const embed = new EmbedBuilder()
         .setAuthor({ name: 'Success!', iconURL: checkIconUrl })
         .setColor(greenColor)
-        .setThumbnail((await getHeadshotImage(user.id)).imageUrl)
         .setDescription(`**${user.name}** is no longer suspended, and has been ranked back to **${newRole}**!`);
+
+    try {
+        const headshot = await getHeadshotImage(user.id);
+        if (headshot && headshot.imageUrl) {
+            embed.setThumbnail(headshot.imageUrl);
+        }
+    } catch (error) {
+        console.error('Failed to set thumbnail for unsuspend embed:', error);
+    }
 
     return embed;
 }

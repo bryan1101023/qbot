@@ -51,6 +51,7 @@ abstract class Command {
     aliases?: string[];
     permissions?: CommandPermission[];
     args?: CommandArgument[];
+    shouldDefer?: boolean;
 
     constructor(options: CommandConfig) {
         this.trigger = options.trigger;
@@ -60,6 +61,7 @@ abstract class Command {
         this.aliases = options.aliases || [];
         this.permissions = options.permissions || [];
         this.args = options.args || [];
+        this.shouldDefer = options.shouldDefer || false;
     }
 
     /**

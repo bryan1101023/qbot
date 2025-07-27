@@ -3,6 +3,7 @@ import {
     ApplicationCommandOptionChoiceData,
     ApplicationCommandOptionAllowedChannelTypes
 } from 'discord.js';
+import { Session } from '@prisma/client';
 
 export interface BotConfig {
     /**
@@ -63,6 +64,10 @@ export interface BotConfig {
          * Access to the revert-ranks, exile, groupban, and ungroupban command.
          */
         admin?: string[];
+        /**
+         * Access to the sessions command.
+         */
+        sessions?: string[];
     }
     // /**
     //  * Configuration for the built-in database module used by suspension and XP-related commands.
@@ -313,6 +318,10 @@ export interface CommandConfig {
      * What are the command arguments?
      */
     args?: CommandArgument[];
+    /**
+     * Should the command defer its response? Useful for commands that take longer than 3 seconds.
+     */
+    shouldDefer?: boolean;
 }
 
 export declare type CommandExport = {
@@ -349,5 +358,37 @@ export declare type DatabaseUser = {
     /**
      * Is the user banned from the group?
      */
-    isBanned: boolean
+    isBanned: boolean;
+    /**
+     * Weekly activity minutes for the user.
+     */
+    weeklyActivityMinutes: number;
+    /**
+     * Monthly activity minutes for the user.
+     */
+    monthlyActivityMinutes: number;
+    /**
+     * Last time activity was reset.
+     */
+    lastActivityReset?: Date;
+}
+
+export interface DbSession extends Session {
+    id: string;
+    time: string;
+    date: Date;
+    status: string;
+    claimedBy: string | null;
+    role: string | null;
+    userId: string | null;
+}
+
+export interface SessionTimeSlot {
+    id: string;
+    time: string;
+    date: Date;
+    claims: Array<{
+        role: string;
+        claimedBy: string;
+    }>;
 }

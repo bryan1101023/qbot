@@ -18,6 +18,7 @@ import { User, PartialUser, GroupMember } from 'bloxy/dist/structures';
 import { logAction } from '../../handlers/handleLogging';
 import { getLinkedRobloxUser } from '../../handlers/accountLinks';
 import { provider } from '../../database';
+import { CommandInteraction, Message } from 'discord.js';
 
 class FireCommand extends Command {
     constructor() {
@@ -53,6 +54,9 @@ class FireCommand extends Command {
 
     async run(ctx: CommandContext) {
         let robloxUser: User | PartialUser;
+        function isInteraction(subject: any): subject is CommandInteraction {
+            return subject && typeof subject === 'object' && 'editReply' in subject && typeof subject.editReply === 'function';
+        }
         try {
             robloxUser = await robloxClient.getUser(ctx.args['roblox-user'] as number);
         } catch (err) {
@@ -68,7 +72,11 @@ class FireCommand extends Command {
                     if(!linkedUser) throw new Error();
                     robloxUser = linkedUser;
                 } catch (err) {
-                    return ctx.reply({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    if (isInteraction(ctx.subject)) {
+                        return ctx.subject.editReply({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    } else {
+                        return ctx.subject.channel.send({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    }
                 }
             }
         }
@@ -78,34 +86,47 @@ class FireCommand extends Command {
             robloxMember = await robloxGroup.getMember(robloxUser.id);
             if(!robloxMember) throw new Error();
         } catch (err) {
-            return ctx.reply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            if (isInteraction(ctx.subject)) {
+                return ctx.subject.editReply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            } else {
+                return ctx.subject.channel.send({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            }
         }
 
-        const groupRoles = await robloxGroup.getRoles();
-        const role = groupRoles.find((role) => role.rank === config.firedRank);
-        if(!role) {
-            console.error(noFiredRankLog);
-            return ctx.reply({ embeds: [ getUnexpectedErrorEmbed() ]});
-        }
-        if(robloxMember.role.rank === config.firedRank) return ctx.reply({ embeds: [ getAlreadyFiredEmbed() ] });
-        if(role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) return ctx.reply({ embeds: [ getRoleNotFoundEmbed() ] });
+        const edit = async (payload: any) => {
+            if (isInteraction(ctx.subject)) {
+                return ctx.subject.editReply(payload);
+            } else {
+                return ctx.subject.channel.send(payload);
+            }
+        };
+        if(robloxMember.role.rank > config.maximumRank) return edit({ embeds: [ getRoleNotFoundEmbed() ] });
 
         if(config.verificationChecks) {
-            const actionEligibility = await checkActionEligibility(ctx.user.id, ctx.guild.id, robloxMember, role.rank);
-            if(!actionEligibility) return ctx.reply({ embeds: [ getVerificationChecksFailedEmbed() ] });
+            const actionEligibility = await checkActionEligibility(ctx.user.id, ctx.guild.id, robloxMember, 0);
+            if(!actionEligibility) return edit({ embeds: [ getVerificationChecksFailedEmbed() ] });
         }
 
         const userData = await provider.findUser(robloxUser.id.toString());
-        if(userData.xp !== 0) return provider.updateUser(robloxUser.id.toString(), { xp: 0 });
-        if(userData.suspendedUntil) return ctx.reply({ embeds: [ getUserSuspendedEmbed() ] });
+        if(userData.suspendedUntil) return edit({ embeds: [ getUserSuspendedEmbed() ] });
 
         try {
-            await robloxGroup.updateMember(robloxUser.id, role.id);
-            ctx.reply({ embeds: [ await getSuccessfulFireEmbed(robloxUser, role.name) ]});
-            logAction('Fire', ctx.user, ctx.args['reason'], robloxUser, `${robloxMember.role.name} (${robloxMember.role.rank}) → ${role.name} (${role.rank})`);
-        } catch (err) {
-            console.error(err);
-            return ctx.reply({ embeds: [ getUnexpectedErrorEmbed() ]});
+            await robloxGroup.updateMember(robloxUser.id, 1); // 1 is usually the 'Guest' or 'Removed' rank
+            await edit({ content: `✅ Successfully removed <@${ctx.args['roblox-user']}> from the group.` });
+            logAction('Fire', ctx.user, ctx.args['reason'], robloxUser, `${robloxMember.role.name} (${robloxMember.role.rank}) → Removed (1)`);
+        } catch (err: any) {
+            console.log('Fire error:', err);
+            if (err.statusCode === 403) {
+                return edit({ content: '❌ The bot does not have permission to remove this user. Please check the bot\'s permissions and group rank.' });
+            }
+            if (err.statusCode === 404) {
+                return edit({ content: '❌ The user was not found. Please check the username/ID and try again.' });
+            }
+            return edit({ content: 'An unexpected error occurred while removing the user.' });
+        }
+        // Ensure reply if not already replied
+        if (!ctx.replied) {
+            await edit({ content: 'An unknown error occurred.' });
         }
     }
 }

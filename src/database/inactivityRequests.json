@@ -1,0 +1,132 @@
+[
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-25T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "ok",
+    "status": "denied",
+    "messageId": "1398132222216638484",
+    "createdAt": "2025-07-25T02:38:17.910Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1010822836962725918",
+    "startDate": "2025-07-25T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "ok",
+    "status": "denied",
+    "messageId": "1398272239610101760",
+    "createdAt": "2025-07-25T11:54:40.607Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-25T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "Trip.",
+    "status": "approved",
+    "messageId": "1398275919818391552",
+    "createdAt": "2025-07-25T12:09:18.053Z",
+    "moderatorId": "1182883969428107365"
+  },
+  {
+    "userId": "1005476651469119498",
+    "startDate": "2025-07-25T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "axel",
+    "status": "denied",
+    "messageId": "1398284134777884743",
+    "createdAt": "2025-07-25T12:41:56.708Z",
+    "moderatorId": "1182883969428107365"
+  },
+  {
+    "userId": "1015992678502109275",
+    "startDate": "2025-07-25T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "on vacation",
+    "status": "approved",
+    "messageId": "1398285942699200605",
+    "createdAt": "2025-07-25T12:49:07.747Z",
+    "moderatorId": "1010822836962725918"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-26T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "ok",
+    "status": "denied",
+    "messageId": "1398411405631291483",
+    "createdAt": "2025-07-25T21:07:40.261Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1190123191197257761",
+    "startDate": "2025-07-26T23:00:00.000Z",
+    "endDate": "2025-08-01T23:00:00.000Z",
+    "reason": "Vacation, wont have internet",
+    "status": "approved",
+    "messageId": "1398722905747230962",
+    "createdAt": "2025-07-26T17:45:27.925Z",
+    "moderatorId": "1182883969428107365"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-27T23:00:00.000Z",
+    "endDate": "2025-07-28T23:00:00.000Z",
+    "reason": "test, dont touch",
+    "status": "denied",
+    "messageId": "1398834110549459066",
+    "createdAt": "2025-07-27T01:07:21.159Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-27T23:00:00.000Z",
+    "endDate": "2025-07-28T23:00:00.000Z",
+    "reason": "test, dont touch",
+    "status": "denied",
+    "messageId": "1398834302648586351",
+    "createdAt": "2025-07-27T01:08:06.984Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-27T23:00:00.000Z",
+    "endDate": "2025-07-28T23:00:00.000Z",
+    "reason": "test, dont touch",
+    "status": "denied",
+    "messageId": "1398835541721743480",
+    "createdAt": "2025-07-27T01:13:02.324Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-26T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "ok",
+    "status": "approved",
+    "messageId": "1398836101678108864",
+    "createdAt": "2025-07-27T01:15:15.880Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "1335347453519462532",
+    "startDate": "2025-07-26T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "put reason here",
+    "status": "approved",
+    "messageId": "1398837156927111189",
+    "createdAt": "2025-07-27T01:19:27.465Z",
+    "moderatorId": "1335347453519462532"
+  },
+  {
+    "userId": "871498939923329104",
+    "startDate": "2025-07-26T23:00:00.000Z",
+    "endDate": "2025-07-27T23:00:00.000Z",
+    "reason": "put reason here",
+    "status": "approved",
+    "messageId": "1398837229656477718",
+    "createdAt": "2025-07-27T01:19:44.805Z",
+    "moderatorId": "1335347453519462532"
+  }
+]

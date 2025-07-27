@@ -20,6 +20,7 @@ import { logAction } from '../../handlers/handleLogging';
 import { getLinkedRobloxUser } from '../../handlers/accountLinks';
 import ms from 'ms';
 import { provider } from '../../database';
+import { CommandInteraction } from 'discord.js';
 
 class SuspendCommand extends Command {
     constructor() {
@@ -54,76 +55,116 @@ class SuspendCommand extends Command {
                     ids: config.permissions.ranking,
                     value: true,
                 }
-            ]
+            ],
+            shouldDefer: true
         });
     }
 
     async run(ctx: CommandContext) {
-        let robloxUser: User | PartialUser;
-        try {
-            robloxUser = await robloxClient.getUser(ctx.args['roblox-user'] as number);
-        } catch (err) {
-            try {
-                const robloxUsers = await robloxClient.getUsersByUsernames([ ctx.args['roblox-user'] as string ]);
-                if(robloxUsers.length === 0) throw new Error();
-                robloxUser = robloxUsers[0];
-            } catch (err) {
-                try {
-                    const idQuery = ctx.args['roblox-user'].replace(/[^0-9]/gm, '');
-                    const discordUser = await discordClient.users.fetch(idQuery);
-                    const linkedUser = await getLinkedRobloxUser(discordUser.id);
-                    if(!linkedUser) throw new Error();
-                    robloxUser = linkedUser;
-                } catch (err) {
-                    return ctx.reply({ embeds: [ getInvalidRobloxUserEmbed() ]});
-                }
-            }
-        }
-
-        let robloxMember: GroupMember;
-        try {
-            robloxMember = await robloxGroup.getMember(robloxUser.id);
-            if(!robloxMember) throw new Error();
-        } catch (err) {
-            return ctx.reply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
-        }
-
-        let duration: number;
-        try {
-            duration = Number(ms(ctx.args['duration']));
-            if(!duration) throw new Error();
-            if(duration < 0.5 * 60000 && duration > 6.31138519 * (10 ^ 10) ) return ctx.reply({ embeds: [ getInvalidDurationEmbed() ] });
-        } catch (err) {
-            return ctx.reply({ embeds: [ getInvalidDurationEmbed() ] });
+        function isInteraction(subject: any): subject is CommandInteraction {
+            return subject && typeof subject === 'object' && 'editReply' in subject && typeof subject.editReply === 'function';
         }
         
-        const endDate = new Date();
-        endDate.setMilliseconds(endDate.getMilliseconds() + duration);
-
-        const groupRoles = await robloxGroup.getRoles();
-        const role = groupRoles.find((role) => role.rank === config.suspendedRank);
-        if(!role) {
-            console.error(noSuspendedRankLog);
-            return ctx.reply({ embeds: [ getUnexpectedErrorEmbed() ]});
-        }
-        if(role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) return ctx.reply({ embeds: [ getRoleNotFoundEmbed() ] });
-
-        if(config.verificationChecks) {
-            const actionEligibility = await checkActionEligibility(ctx.user.id, ctx.guild.id, robloxMember, role.rank);
-            if(!actionEligibility) return ctx.reply({ embeds: [ getVerificationChecksFailedEmbed() ] });
-        }
-
-        const userData = await provider.findUser(robloxUser.id.toString());
-        if(userData.suspendedUntil) return ctx.reply({ embeds: [ getAlreadySuspendedEmbed() ] });
-        await provider.updateUser(robloxUser.id.toString(), { suspendedUntil: endDate, unsuspendRank: robloxMember.role.id });
-
         try {
-            if(robloxMember.role.id !== role.id) await robloxGroup.updateMember(robloxUser.id, role.id);
-            ctx.reply({ embeds: [ await getSuccessfulSuspendEmbed(robloxUser, role.name, endDate) ]});
-            logAction('Suspend', ctx.user, ctx.args['reason'], robloxUser, `${robloxMember.role.name} (${robloxMember.role.rank}) → ${role.name} (${role.rank})`, endDate);
+            const edit = async (payload: any) => {
+                if (isInteraction(ctx.subject)) {
+                    return ctx.subject.editReply(payload);
+                } else {
+                    return ctx.subject.channel.send(payload);
+                }
+            };
+
+            let robloxUser: User | PartialUser;
+            try {
+                robloxUser = await robloxClient.getUser(ctx.args['roblox-user'] as number);
+            } catch (err) {
+                try {
+                    const robloxUsers = await robloxClient.getUsersByUsernames([ ctx.args['roblox-user'] as string ]);
+                    if(robloxUsers.length === 0) throw new Error();
+                    robloxUser = robloxUsers[0];
+                } catch (err) {
+                    try {
+                        const idQuery = ctx.args['roblox-user'].replace(/[^0-9]/gm, '');
+                        const discordUser = await discordClient.users.fetch(idQuery);
+                        const linkedUser = await getLinkedRobloxUser(discordUser.id);
+                        if(!linkedUser) throw new Error();
+                        robloxUser = linkedUser;
+                    } catch (err) {
+                        return edit({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    }
+                }
+            }
+
+            let robloxMember: GroupMember;
+            try {
+                robloxMember = await robloxGroup.getMember(robloxUser.id);
+                if(!robloxMember) throw new Error();
+            } catch (err) {
+                return edit({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            }
+
+            let duration: number;
+            try {
+                duration = Number(ms(ctx.args['duration']));
+                if(!duration) throw new Error();
+                if(duration < 0.5 * 60000 || duration > 6.31138519 * Math.pow(10, 10)) {
+                    return edit({ embeds: [ getInvalidDurationEmbed() ] });
+                }
+            } catch (err) {
+                return edit({ embeds: [ getInvalidDurationEmbed() ] });
+            }
+            
+            const endDate = new Date();
+            endDate.setMilliseconds(endDate.getMilliseconds() + duration);
+
+            const groupRoles = await robloxGroup.getRoles();
+            const role = groupRoles.find((role) => role.rank === config.suspendedRank);
+            if(!role) {
+                console.error(noSuspendedRankLog);
+                return edit({ embeds: [ getUnexpectedErrorEmbed() ]});
+            }
+            if(role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) {
+                return edit({ embeds: [ getRoleNotFoundEmbed() ] });
+            }
+
+            if(config.verificationChecks) {
+                const actionEligibility = await checkActionEligibility(ctx.user.id, ctx.guild.id, robloxMember, role.rank);
+                if(!actionEligibility) {
+                    return edit({ embeds: [ getVerificationChecksFailedEmbed() ] });
+                }
+            }
+
+            const userData = await provider.findUser(robloxUser.id.toString());
+            if(userData.suspendedUntil) {
+                return edit({ embeds: [ getAlreadySuspendedEmbed() ] });
+            }
+            await provider.updateUser(robloxUser.id.toString(), { suspendedUntil: endDate, unsuspendRank: robloxMember.role.id });
+
+            try {
+                // Update member and prepare success message in parallel
+                const [, successEmbed] = await Promise.all([
+                    robloxMember.role.id !== role.id ? robloxGroup.updateMember(robloxUser.id, role.id) : Promise.resolve(),
+                    getSuccessfulSuspendEmbed(robloxUser, role.name, endDate)
+                ]);
+                
+                await edit({ embeds: [ successEmbed ]});
+                
+                // Log the action
+                logAction('Suspend', ctx.user, ctx.args['reason'], robloxUser, `${robloxMember.role.name} (${robloxMember.role.rank}) → ${role.name} (${role.rank})`, endDate);
+            } catch (err) {
+                console.error('Error in suspend final step:', err);
+                return edit({ embeds: [ getUnexpectedErrorEmbed() ]});
+            }
         } catch (err) {
-            console.error(err);
-            return ctx.reply({ embeds: [ getUnexpectedErrorEmbed() ]});
+            console.error('Suspend command error:', err);
+            const edit = async (payload: any) => {
+                if (isInteraction(ctx.subject)) {
+                    return ctx.subject.editReply(payload);
+                } else {
+                    return ctx.subject.channel.send(payload);
+                }
+            };
+            return edit({ embeds: [ getUnexpectedErrorEmbed() ]});
         }
     }
 }

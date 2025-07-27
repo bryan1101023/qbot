@@ -17,6 +17,7 @@ import { checkActionEligibility } from '../../handlers/verificationChecks';
 import { logAction } from '../../handlers/handleLogging';
 import { getLinkedRobloxUser } from '../../handlers/accountLinks';
 import { provider } from '../../database';
+import { CommandInteraction, Message } from 'discord.js';
 
 class PromoteCommand extends Command {
     constructor() {
@@ -46,12 +47,16 @@ class PromoteCommand extends Command {
                     ids: config.permissions.ranking,
                     value: true,
                 }
-            ]
+            ],
+            shouldDefer: true
         });
     }
 
     async run(ctx: CommandContext) {
         let robloxUser: User | PartialUser;
+        function isInteraction(subject: any): subject is CommandInteraction {
+            return subject && typeof subject === 'object' && 'editReply' in subject && typeof subject.editReply === 'function';
+        }
         try {
             robloxUser = await robloxClient.getUser(ctx.args['roblox-user'] as number);
         } catch (err) {
@@ -67,7 +72,11 @@ class PromoteCommand extends Command {
                     if(!linkedUser) throw new Error();
                     robloxUser = linkedUser;
                 } catch (err) {
-                    return ctx.reply({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    if (isInteraction(ctx.subject)) {
+                        return ctx.subject.editReply({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    } else {
+                        return ctx.subject.channel.send({ embeds: [ getInvalidRobloxUserEmbed() ]});
+                    }
                 }
             }
         }
@@ -77,30 +86,47 @@ class PromoteCommand extends Command {
             robloxMember = await robloxGroup.getMember(robloxUser.id);
             if(!robloxMember) throw new Error();
         } catch (err) {
-            return ctx.reply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            if (isInteraction(ctx.subject)) {
+                return ctx.subject.editReply({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            } else {
+                return ctx.subject.channel.send({ embeds: [ getRobloxUserIsNotMemberEmbed() ]});
+            }
         }
 
         const groupRoles = await robloxGroup.getRoles();
         const currentRoleIndex = groupRoles.findIndex((role) => role.rank === robloxMember.role.rank);
         const role = groupRoles[currentRoleIndex - 1];
-        if(!role.rank || role.rank === 0) return ctx.reply({ embeds: [ getNoRankBelowEmbed() ]});
-        if(role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) return ctx.reply({ embeds: [ getRoleNotFoundEmbed() ] });
+        const edit = async (payload: any) => {
+            if (isInteraction(ctx.subject)) {
+                return ctx.subject.editReply(payload);
+            } else {
+                return ctx.subject.channel.send(payload);
+            }
+        };
+        if(!role.rank || role.rank === 0) return edit({ embeds: [ getNoRankBelowEmbed() ]});
+        if(role.rank > config.maximumRank || robloxMember.role.rank > config.maximumRank) return edit({ embeds: [ getRoleNotFoundEmbed() ] });
 
         if(config.verificationChecks) {
             const actionEligibility = await checkActionEligibility(ctx.user.id, ctx.guild.id, robloxMember, role.rank);
-            if(!actionEligibility) return ctx.reply({ embeds: [ getVerificationChecksFailedEmbed() ] });
+            if(!actionEligibility) return edit({ embeds: [ getVerificationChecksFailedEmbed() ] });
         }
 
         const userData = await provider.findUser(robloxUser.id.toString());
-        if(userData.suspendedUntil) return ctx.reply({ embeds: [ getUserSuspendedEmbed() ] });
+        if(userData.suspendedUntil) return edit({ embeds: [ getUserSuspendedEmbed() ] });
 
         try {
             await robloxGroup.updateMember(robloxUser.id, role.id);
-            ctx.reply({ embeds: [ await getSuccessfulDemotionEmbed(robloxUser, role.name) ]})
+            await edit({ embeds: [ await getSuccessfulDemotionEmbed(robloxUser, role.name) ]});
             logAction('Demote', ctx.user, ctx.args['reason'], robloxUser, `${robloxMember.role.name} (${robloxMember.role.rank}) → ${role.name} (${role.rank})`);
-        } catch (err) {
-            console.log(err);
-            return ctx.reply({ embeds: [ getUnexpectedErrorEmbed() ]});
+        } catch (err: any) {
+            console.log('Demote error:', err);
+            if (err.statusCode === 403) {
+                return edit({ content: '❌ The bot does not have permission to demote this user. Please check the bot\'s permissions and group rank.' });
+            }
+            if (err.statusCode === 404) {
+                return edit({ content: '❌ The user or role was not found. Please check the username/ID and try again.' });
+            }
+            return edit({ embeds: [ getUnexpectedErrorEmbed() ]});
         }
     }
 }
